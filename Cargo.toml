@@ -1,0 +1,25 @@
+[package]
+name = "json-structural-diff"
+version = "0.1.0"
+authors = ["Luni-4 <luni-4@hotmail.it>"]
+description = "A Rust JSON structural diff library"
+repository = "https://github.com/Luni-4/json-structural-diff"
+keywords = ["json-structural-diff", "json-diff"]
+license = "MIT"
+edition = "2018"
+
+[features]
+colorize = ["console"]
+
+[dependencies]
+difflib = "^0.4"
+regex = "^1"
+serde_json = "^1.0"
+
+[dependencies.console]
+version = "^0.13"
+default-features = true
+optional = true
+
+[workspace]
+members = ["json-structural-diff-cli"]

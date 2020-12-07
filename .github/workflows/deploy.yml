@@ -1,0 +1,132 @@
+name: deploy
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+
+  windows-binaries:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install stable
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+
+    - name: Build json-diff
+      run: |
+        cargo build --release --workspace
+
+    - name: Create zip
+      run: |
+        cd target/release
+        7z a ../../json-structural-diff-windows-msvc.zip `
+             "json-structural-diff-cli.exe"
+
+    - name: Upload binaries
+      uses: actions/upload-artifact@v2
+      with:
+        name: json-diff-windows-msvc-binaries
+        path: json-structural-diff-windows-msvc.zip
+
+  linux-binaries:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install musl-tools
+      run: |
+        sudo apt-get install musl-tools
+
+    - name: Install Rust stable and musl target
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        target: x86_64-unknown-linux-musl
+        override: true
+
+    - name: Build json-diff
+      run: |
+        cargo build --workspace --release --target x86_64-unknown-linux-musl
+
+    - name: Create zip
+      run: |
+        cd target/x86_64-unknown-linux-musl/release
+        strip json-structural-diff-cli
+        tar -czvf $GITHUB_WORKSPACE/json-structural-diff-linux.tar.gz \
+                  json-structural-diff-cli
+
+    - name: Upload binaries
+      uses: actions/upload-artifact@v2
+      with:
+        name: json-diff-linux-binaries
+        path: json-structural-diff-linux.tar.gz
+
+  macos-binaries:
+
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install stable
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+
+    - name: Build json-diff
+      run: |
+        cargo build --workspace --release
+
+    - name: Create zip
+      run: |
+        cd target/release
+        strip json-structural-diff-cli
+        zip $GITHUB_WORKSPACE/json-structural-diff-macos.zip \
+            json-structural-diff-cli
+
+    - name: Upload binaries
+      uses: actions/upload-artifact@v2
+      with:
+        name: json-diff-macos-binaries
+        path: json-structural-diff-macos.zip
+
+  deploy:
+
+    needs: [windows-binaries, linux-binaries, macos-binaries]
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Download zip files
+      uses: actions/download-artifact@v2
+
+    - name: Create Cargo.lock
+      run: |
+        cargo update
+
+    - name: Create a release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          Cargo.lock
+          json-diff-linux-binaries/json-structural-diff-linux.tar.gz
+          json-diff-macos-binaries/json-structural-diff-macos.zip
+          json-diff-windows-msvc-binaries/json-structural-diff-windows-msvc.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
