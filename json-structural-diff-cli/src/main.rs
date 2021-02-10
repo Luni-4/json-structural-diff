@@ -9,7 +9,6 @@ use std::process;
 use clap::{App, Arg};
 use console::Term;
 use rayon::prelude::*;
-use serde_json::Value;
 use walkdir::{DirEntry, WalkDir};
 
 use json_structural_diff::{colorize, JsonDiff};
@@ -27,25 +26,28 @@ fn act_on_file(
     cfg: &Config,
 ) -> std::io::Result<()> {
     let buffer1 = std::fs::read(&path1).unwrap();
-    let json1: Value = serde_json::from_slice(&buffer1).unwrap();
     let buffer2 = std::fs::read(path2).unwrap();
-    let json2: Value = serde_json::from_slice(&buffer2).unwrap();
 
-    if json1 != json2 {
-        let json_diff = JsonDiff::diff(&json1, &json2, cfg.only_keys);
-        let result = json_diff.diff.unwrap();
-        let json_string = if cfg.raw {
-            serde_json::to_string_pretty(&result)?
-        } else {
-            colorize(&result, cfg.color)
-        };
-        if let Some(output_path) = output_path {
-            let output_filename = path1.file_name().unwrap().to_str().unwrap();
-            let mut output_file = File::create(output_path.join(output_filename))?;
-            writeln!(&mut output_file, "{}", json_string)?;
-        } else {
-            let mut term = Term::stdout();
-            term.write_all(json_string.as_bytes())?;
+    if let (Ok(json1), Ok(json2)) = (
+        serde_json::from_slice(&buffer1),
+        serde_json::from_slice(&buffer2),
+    ) {
+        if json1 != json2 {
+            let json_diff = JsonDiff::diff(&json1, &json2, cfg.only_keys);
+            let result = json_diff.diff.unwrap();
+            let json_string = if cfg.raw {
+                serde_json::to_string_pretty(&result)?
+            } else {
+                colorize(&result, cfg.color)
+            };
+            if let Some(output_path) = output_path {
+                let output_filename = path1.file_name().unwrap().to_str().unwrap();
+                let mut output_file = File::create(output_path.join(output_filename))?;
+                writeln!(&mut output_file, "{}", json_string)?;
+            } else {
+                let mut term = Term::stdout();
+                term.write_all(json_string.as_bytes())?;
+            }
         }
     }
     Ok(())
