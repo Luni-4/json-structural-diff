@@ -21,7 +21,7 @@ To build with the `colorize` feature:
 cargo build --all-features
 ```
 
-If you want to build the lib in release mode, add the `--release` optio
+If you want to build the lib in release mode, add the `--release` option
 to the commands above.
 
 ## License
