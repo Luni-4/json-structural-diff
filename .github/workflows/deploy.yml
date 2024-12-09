@@ -7,126 +7,133 @@ on:
 
 jobs:
 
-  windows-binaries:
+  create-windows-binaries:
 
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Install stable
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
+      uses: dtolnay/rust-toolchain@stable
 
-    - name: Build json-diff
+    - name: Build jsons-structural-diff
       run: |
         cargo build --release --workspace
 
-    - name: Create zip
+    - name: Get the version
+      shell: bash
+      id: tagName
       run: |
-        cd target/release
-        7z a ../../json-structural-diff-windows-msvc.zip `
-             "json-structural-diff-cli.exe"
+        VERSION=$(cargo pkgid | cut -d# -f2)
+        echo "tag=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Upload binaries
-      uses: actions/upload-artifact@v2
+    - name: Build package
+      id: package
+      shell: bash
+      run: |
+        ARCHIVE_TARGET="x86_64-pc-windows-msvc"
+        ARCHIVE_NAME="json-structural-diff-${{ steps.tagName.outputs.tag }}-$ARCHIVE_TARGET"
+        ARCHIVE_FILE="${ARCHIVE_NAME}.zip"
+        7z a ${ARCHIVE_FILE} ./target/release/json-structural-diff-cli.exe
+        echo "file=$ARCHIVE_FILE" >> $GITHUB_OUTPUT
+        echo "name=$ARCHIVE_NAME.zip" >> $GITHUB_OUTPUT
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
       with:
-        name: json-diff-windows-msvc-binaries
-        path: json-structural-diff-windows-msvc.zip
+        name: ${{ steps.package.outputs.name }}
+        path: ${{ steps.package.outputs.file }}
 
-  linux-binaries:
+  create-unix-binaries:
 
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - os: macos-latest
+            target: x86_64-apple-darwin
+
+    runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
-    - name: Install musl-tools
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        target: ${{ matrix.target }}
+
+    - name: Install musl
+      if: contains(matrix.target, 'linux-musl')
       run: |
         sudo apt-get install musl-tools
 
-    - name: Install Rust stable and musl target
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        target: x86_64-unknown-linux-musl
-        override: true
-
-    - name: Build json-diff
+    - name: Build json-structural-diff
       run: |
-        cargo build --workspace --release --target x86_64-unknown-linux-musl
+        cargo build --workspace --release --target ${{ matrix.target }}
 
-    - name: Create zip
+    - name: Strip binary
       run: |
-        cd target/x86_64-unknown-linux-musl/release
-        strip json-structural-diff-cli
-        tar -czvf $GITHUB_WORKSPACE/json-structural-diff-linux.tar.gz \
-                  json-structural-diff-cli
+        strip target/${{ matrix.target }}/release/json-structural-diff-cli
 
-    - name: Upload binaries
-      uses: actions/upload-artifact@v2
-      with:
-        name: json-diff-linux-binaries
-        path: json-structural-diff-linux.tar.gz
-
-  macos-binaries:
-
-    runs-on: macos-latest
-
-    steps:
-    - uses: actions/checkout@v2
-
-    - name: Install stable
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
-
-    - name: Build json-diff
+    - name: Get the version
+      id: tagName
       run: |
-        cargo build --workspace --release
+        VERSION=$(cargo pkgid | cut -d# -f2)
+        echo "tag=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Create zip
+    - name: Build package
+      id: package
       run: |
-        cd target/release
-        strip json-structural-diff-cli
-        zip $GITHUB_WORKSPACE/json-structural-diff-macos.zip \
-            json-structural-diff-cli
+        TAR_FILE=json-structural-diff-${{ steps.tagName.outputs.tag }}-${{ matrix.target }}
+        cd target/${{ matrix.target }}/release
+        tar -czvf $GITHUB_WORKSPACE/$TAR_FILE.tar.gz json-structural-diff-cli
+        echo "name=$TAR_FILE" >> $GITHUB_OUTPUT
+        echo "file=$TAR_FILE.tar.gz" >> $GITHUB_OUTPUT
 
-    - name: Upload binaries
-      uses: actions/upload-artifact@v2
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
       with:
-        name: json-diff-macos-binaries
-        path: json-structural-diff-macos.zip
+        name: ${{ steps.package.outputs.name }}
+        path: ${{ steps.package.outputs.file }}
+
 
   deploy:
 
-    needs: [windows-binaries, linux-binaries, macos-binaries]
+    needs: [create-windows-binaries, create-unix-binaries]
 
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-    - name: Download zip files
-      uses: actions/download-artifact@v2
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Create Cargo.lock
-      run: |
-        cargo update
+      - name: Create Cargo.lock
+        run: |
+          cargo update
 
-    - name: Create a release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          Cargo.lock
-          json-diff-linux-binaries/json-structural-diff-linux.tar.gz
-          json-diff-macos-binaries/json-structural-diff-macos.zip
-          json-diff-windows-msvc-binaries/json-structural-diff-windows-msvc.zip
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get version
+        id: tagName
+        run: |
+          VERSION=$(cargo pkgid | cut -d# -f2)
+          echo "tag=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          path: ./binaries
+
+      - name: Create a release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: v${{ steps.tagName.outputs.tag }}
+          files: |
+            ./binaries/**/*.zip
+            ./binaries/**/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
