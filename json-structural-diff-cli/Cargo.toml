@@ -1,6 +1,6 @@
 [package]
 name = "json-structural-diff-cli"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Luni-4 <luni-4@hotmail.it>"]
 description = "A Rust JSON structural diff cli"
 repository = "https://github.com/Luni-4/json-structural-diff"
