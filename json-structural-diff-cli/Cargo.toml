@@ -18,7 +18,7 @@ name = "json-structural-diff-cli"
 [dependencies]
 clap = "^2.33"
 console = "^0.13"
-json-structural-diff = { path = "..", version = "0.1.0", features=["colorize"]}
+json-structural-diff = { path = "..", features=["colorize"]}
 rayon = "^1.5"
 serde_json = "^1.0"
 walkdir = "^2.3"
