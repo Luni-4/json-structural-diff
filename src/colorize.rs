@@ -118,6 +118,7 @@ pub fn colorize_to_array(diff: &Value) -> Vec<String> {
 ///
 /// If `None`, there is no JSON structural difference to be formatted.
 #[cfg(feature = "colorize")]
+#[must_use]
 #[allow(clippy::module_name_repetitions)]
 pub fn colorize(diff: &Value, is_color: bool) -> String {
     use console::Style;
@@ -125,7 +126,7 @@ pub fn colorize(diff: &Value, is_color: bool) -> String {
     let mut output: Vec<String> = Vec::new();
 
     let mut output_func = |color: &str, line: &str| {
-        let color_line = format!("{}{}", color, line);
+        let color_line = format!("{color}{line}");
         let str_output = if is_color {
             match color {
                 "+" => format!("{}", Style::new().green().apply_to(color_line)),
