@@ -6,11 +6,11 @@ where
     F: FnMut(&str, &str),
 {
     let prefix = if let Some(key) = key {
-        format!("{}: ", key)
+        format!("{key}: ")
     } else {
-        "".to_owned()
+        String::new()
     };
-    let subindent = &format!("{}  ", indent);
+    let subindent = &format!("{indent}  ");
 
     match diff {
         Value::Object(obj) => {
@@ -20,7 +20,7 @@ where
                 subcolorize(key, old, output, "-", indent);
                 subcolorize(key, new, output, "+", indent);
             } else {
-                output(color, &format!("{}{}{{", indent, prefix));
+                output(color, &format!("{indent}{prefix}{{"));
                 let re_delete = Regex::new(r"^(.*)__deleted$").unwrap();
                 let re_added = Regex::new(r"^(.*)__added$").unwrap();
                 for (subkey, subvalue) in obj {
@@ -44,13 +44,13 @@ where
                         );
                         continue;
                     }
-                    subcolorize(Some(&subkey), subvalue, output, color, subindent);
+                    subcolorize(Some(subkey), subvalue, output, color, subindent);
                 }
-                output(color, &format!("{}}}", indent));
+                output(color, &format!("{indent}}}"));
             }
         }
         Value::Array(array) => {
-            output(color, &format!("{}{}[", indent, prefix));
+            output(color, &format!("{indent}{prefix}["));
 
             let mut looks_like_diff = true;
             for item in array {
@@ -76,11 +76,9 @@ where
                         let op = subitem[0].as_str().unwrap();
                         let subvalue = &subitem.get(1);
                         if op == " " && subvalue.is_none() {
-                            output(" ", &format!("{}...", subindent));
+                            output(" ", &format!("{subindent}..."));
                         } else {
-                            if !([" ", "-", "+", "~"].contains(&op)) {
-                                panic!("Unexpected op '{}'", op);
-                            }
+                            assert!(([" ", "-", "+", "~"].contains(&op)), "Unexpected op '{}'", op);
                             let subvalue = subvalue.unwrap();
                             let color = if op == "~" { " " } else { op };
                             subcolorize(None, subvalue, output, color, subindent);
@@ -93,7 +91,7 @@ where
                 }
             }
 
-            output(color, &format!("{}]", indent));
+            output(color, &format!("{indent}]"));
         }
         _ => output(color, &(indent.to_owned() + &prefix + &diff.to_string())),
     }
@@ -102,11 +100,11 @@ where
 /// Returns the JSON structural difference formatted as a `Vec<String>`.
 ///
 /// If `None`, there is no JSON structural difference to be formatted.
-pub fn colorize_to_array(diff: &Value) -> Vec<String> {
+#[must_use] pub fn colorize_to_array(diff: &Value) -> Vec<String> {
     let mut output: Vec<String> = Vec::new();
 
     let mut output_func = |color: &str, line: &str| {
-        output.push(format!("{}{}", color, line));
+        output.push(format!("{color}{line}"));
     };
 
     subcolorize(None, diff, &mut output_func, " ", "");

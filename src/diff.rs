@@ -35,19 +35,15 @@ impl BestMatch {
 
 impl JsonDiff {
     /// Finds the JSON structural difference of two JSON files.
-    pub fn diff(json1: &Value, json2: &Value, keys_only: bool) -> Self {
+    #[must_use] pub fn diff(json1: &Value, json2: &Value, keys_only: bool) -> Self {
         Self::diff_with_score(json1, json2, keys_only)
     }
 
     /// Finds the JSON structural difference of two JSON files and
     /// returns it as a formatted string.
-    pub fn diff_string(json1: &Value, json2: &Value, keys_only: bool) -> Option<String> {
+    #[must_use] pub fn diff_string(json1: &Value, json2: &Value, keys_only: bool) -> Option<String> {
         let Self { score: _, diff } = Self::diff(json1, json2, keys_only);
-        if let Some(value) = diff {
-            Some(colorize_to_array(&value).join("\n") + "\n")
-        } else {
-            None
-        }
+        diff.map(|value| colorize_to_array(&value).join("\n") + "\n")
     }
 
     fn object_diff(obj1: &Map<String, Value>, obj2: &Map<String, Value>, keys_only: bool) -> Self {
@@ -56,7 +52,7 @@ impl JsonDiff {
 
         for (key, value1) in obj1 {
             if !obj2.contains_key(key) {
-                let key_deleted = format!("{}__deleted", key);
+                let key_deleted = format!("{key}__deleted");
                 result.insert(key_deleted, value1.clone());
                 score -= 30.;
             }
@@ -64,7 +60,7 @@ impl JsonDiff {
 
         for (key, value2) in obj2 {
             if !obj1.contains_key(key) {
-                let key_added = format!("{}__added", key);
+                let key_added = format!("{key}__added");
                 result.insert(key_added, value2.clone());
                 score -= 30.;
             }
@@ -76,11 +72,11 @@ impl JsonDiff {
                 let Self {
                     score: subscore,
                     diff: change,
-                } = Self::diff_with_score(&value1, &value2, keys_only);
+                } = Self::diff_with_score(value1, value2, keys_only);
                 if let Some(change) = change {
                     result.insert(key.clone(), change);
                 }
-                score += ((subscore / 5.).max(-10.)).min(20.);
+                score += (subscore / 5.).clamp(-10., 20.);
             }
         }
 
@@ -117,7 +113,7 @@ impl JsonDiff {
 
         for (match_index, (key, candidate)) in fuzzy_originals.into_iter().enumerate() {
             if key != "__next" {
-                let index_distance = (match_index as isize - index as isize).abs() as usize;
+                let index_distance = (match_index as isize - index as isize).unsigned_abs();
                 if Self::check_type(item, candidate) {
                     let Self { score, diff: _ } = Self::diff(item, candidate, false);
                     if best_match.as_ref().map_or(true, |v| score > v.score)
@@ -232,12 +228,10 @@ impl JsonDiff {
                 "equal" => {
                     for key in seq1.iter().take(opcode.first_end).skip(opcode.first_start) {
                         let is_scalarized1 = Self::is_scalarized(key, &originals1);
-                        if is_scalarized1 && !(Self::is_scalarized(key, &originals2)) {
-                            panic!(
+                        assert!(!(is_scalarized1 && !(Self::is_scalarized(key, &originals2))), 
                             "Internal bug: the items associated to the key {} are different in the two dictionaries",
                             key
                         );
-                        }
                         if is_scalarized1 {
                             let item1 = Self::descalarize(key, &scalar_values1, &originals1);
                             let item2 = Self::descalarize(key, &scalar_values2, &originals2);
