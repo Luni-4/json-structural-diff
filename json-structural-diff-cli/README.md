@@ -1,9 +1,5 @@
 # A Rust JSON structural diff CLI
 
-[![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Actions Status](https://github.com/Luni-4/json-structural-diff/workflows/json-structural-diff/badge.svg)](https://github.com/Luni-4/json-structural-diff/actions)
-[![Coverage Status](https://coveralls.io/repos/github/Luni-4/json-structural-diff/badge.svg?branch=master)](https://coveralls.io/github/Luni-4/json-structural-diff?branch=master)
-
 A pure-Rust JSON structural diff CLI based on the JSON structural diff library.
 
 ## Building CLI
