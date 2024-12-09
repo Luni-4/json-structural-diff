@@ -78,7 +78,11 @@ where
                         if op == " " && subvalue.is_none() {
                             output(" ", &format!("{subindent}..."));
                         } else {
-                            assert!(([" ", "-", "+", "~"].contains(&op)), "Unexpected op '{}'", op);
+                            assert!(
+                                ([" ", "-", "+", "~"].contains(&op)),
+                                "Unexpected op '{}'",
+                                op
+                            );
                             let subvalue = subvalue.unwrap();
                             let color = if op == "~" { " " } else { op };
                             subcolorize(None, subvalue, output, color, subindent);
@@ -100,7 +104,9 @@ where
 /// Returns the JSON structural difference formatted as a `Vec<String>`.
 ///
 /// If `None`, there is no JSON structural difference to be formatted.
-#[must_use] pub fn colorize_to_array(diff: &Value) -> Vec<String> {
+#[must_use]
+#[allow(clippy::module_name_repetitions)]
+pub fn colorize_to_array(diff: &Value) -> Vec<String> {
     let mut output: Vec<String> = Vec::new();
 
     let mut output_func = |color: &str, line: &str| {
@@ -116,6 +122,7 @@ where
 ///
 /// If `None`, there is no JSON structural difference to be formatted.
 #[cfg(feature = "colorize")]
+#[allow(clippy::module_name_repetitions)]
 pub fn colorize(diff: &Value, is_color: bool) -> String {
     use console::Style;
 

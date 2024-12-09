@@ -5,6 +5,7 @@ use crate::colorize::colorize_to_array;
 
 /// Auxiliary structure to encapsulate data about the structural difference
 /// of two JSON files.
+#[allow(clippy::module_name_repetitions)]
 pub struct JsonDiff {
     /// Quantifies the difference between two JSON files.
     ///
@@ -35,13 +36,15 @@ impl BestMatch {
 
 impl JsonDiff {
     /// Finds the JSON structural difference of two JSON files.
-    #[must_use] pub fn diff(json1: &Value, json2: &Value, keys_only: bool) -> Self {
+    #[must_use]
+    pub fn diff(json1: &Value, json2: &Value, keys_only: bool) -> Self {
         Self::diff_with_score(json1, json2, keys_only)
     }
 
     /// Finds the JSON structural difference of two JSON files and
     /// returns it as a formatted string.
-    #[must_use] pub fn diff_string(json1: &Value, json2: &Value, keys_only: bool) -> Option<String> {
+    #[must_use]
+    pub fn diff_string(json1: &Value, json2: &Value, keys_only: bool) -> Option<String> {
         let Self { score: _, diff } = Self::diff(json1, json2, keys_only);
         diff.map(|value| colorize_to_array(&value).join("\n") + "\n")
     }
@@ -81,6 +84,7 @@ impl JsonDiff {
         }
 
         if result.is_empty() {
+            #[allow(clippy::cast_precision_loss)]
             Self {
                 score: 100. * (obj1.len() as f64).max(0.5),
                 diff: None,
@@ -94,7 +98,6 @@ impl JsonDiff {
         }
     }
 
-    #[inline(always)]
     fn check_type(item1: &Value, item2: &Value) -> bool {
         item1.is_null() == item2.is_null()
             || item1.is_boolean() == item2.is_boolean()
@@ -113,7 +116,7 @@ impl JsonDiff {
 
         for (match_index, (key, candidate)) in fuzzy_originals.into_iter().enumerate() {
             if key != "__next" {
-                let index_distance = (match_index as isize - index as isize).unsigned_abs();
+                let index_distance = (match_index).wrapping_sub(index);
                 if Self::check_type(item, candidate) {
                     let Self { score, diff: _ } = Self::diff(item, candidate, false);
                     if best_match.as_ref().map_or(true, |v| score > v.score)
@@ -173,17 +176,14 @@ impl JsonDiff {
         output_array
     }
 
-    #[inline(always)]
     fn is_scalarized(key: &str, originals: &Map<String, Value>) -> bool {
         originals.contains_key(key)
     }
 
-    #[inline(always)]
     fn get_scalar(key: &str, scalar_values: &Map<String, Value>) -> Value {
         scalar_values.get(key).unwrap().clone()
     }
 
-    #[inline(always)]
     fn descalarize(
         key: &str,
         scalar_values: &Map<String, Value>,
@@ -196,6 +196,7 @@ impl JsonDiff {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn array_diff(array1: &[Value], array2: &[Value], keys_only: bool) -> Self {
         let mut originals1 = Map::new();
         let mut scalar_values1 = Map::new();
@@ -228,7 +229,7 @@ impl JsonDiff {
                 "equal" => {
                     for key in seq1.iter().take(opcode.first_end).skip(opcode.first_start) {
                         let is_scalarized1 = Self::is_scalarized(key, &originals1);
-                        assert!(!(is_scalarized1 && !(Self::is_scalarized(key, &originals2))), 
+                        assert!(!is_scalarized1 || (Self::is_scalarized(key, &originals2)),
                             "Internal bug: the items associated to the key {} are different in the two dictionaries",
                             key
                         );
@@ -275,26 +276,7 @@ impl JsonDiff {
                     }
                 }
                 "replace" => {
-                    if !keys_only {
-                        for key in seq1.iter().take(opcode.first_end).skip(opcode.first_start) {
-                            result.push(json!([
-                                json!('-'),
-                                Self::descalarize(key, &scalar_values1, &originals1)
-                            ]));
-                            score -= 5.;
-                        }
-                        for key in seq2
-                            .iter()
-                            .take(opcode.second_end)
-                            .skip(opcode.second_start)
-                        {
-                            result.push(json!([
-                                json!('+'),
-                                Self::descalarize(key, &scalar_values2, &originals2)
-                            ]));
-                            score -= 5.;
-                        }
-                    } else {
+                    if keys_only {
                         for (key1, key2) in seq1
                             .iter()
                             .take(opcode.first_end)
@@ -321,6 +303,25 @@ impl JsonDiff {
                             } else {
                                 result.push(json!(' '));
                             }
+                        }
+                    } else {
+                        for key in seq1.iter().take(opcode.first_end).skip(opcode.first_start) {
+                            result.push(json!([
+                                json!('-'),
+                                Self::descalarize(key, &scalar_values1, &originals1)
+                            ]));
+                            score -= 5.;
+                        }
+                        for key in seq2
+                            .iter()
+                            .take(opcode.second_end)
+                            .skip(opcode.second_start)
+                        {
+                            result.push(json!([
+                                json!('+'),
+                                Self::descalarize(key, &scalar_values2, &originals2)
+                            ]));
+                            score -= 5.;
                         }
                     }
                 }
