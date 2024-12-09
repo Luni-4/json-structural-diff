@@ -3,7 +3,7 @@ extern crate clap;
 
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 use clap::{App, Arg};
@@ -22,10 +22,10 @@ struct Config {
 fn act_on_file(
     path1: &PathBuf,
     path2: &PathBuf,
-    output_path: &Option<PathBuf>,
+    output_path: Option<&PathBuf>,
     cfg: &Config,
 ) -> std::io::Result<()> {
-    let buffer1 = std::fs::read(&path1).unwrap();
+    let buffer1 = std::fs::read(path1).unwrap();
     let buffer2 = std::fs::read(path2).unwrap();
 
     if let (Ok(json1), Ok(json2)) = (
@@ -43,7 +43,7 @@ fn act_on_file(
             if let Some(output_path) = output_path {
                 let output_filename = path1.file_name().unwrap().to_str().unwrap();
                 let mut output_file = File::create(output_path.join(output_filename))?;
-                writeln!(&mut output_file, "{}", json_string)?;
+                writeln!(&mut output_file, "{json_string}")?;
             } else {
                 let mut term = Term::stdout();
                 term.write_all(json_string.as_bytes())?;
@@ -57,21 +57,15 @@ fn is_hidden(entry: &DirEntry) -> bool {
     entry
         .file_name()
         .to_str()
-        .map(|s| s.starts_with('.'))
-        .unwrap_or(false)
+        .is_some_and(|s| s.starts_with('.'))
 }
 
-fn explore(
-    path1: &PathBuf,
-    path2: &PathBuf,
-    output_path: &Option<PathBuf>,
-    cfg: &Config,
-) -> std::io::Result<()> {
-    WalkDir::new(&path1)
+fn explore(path1: &PathBuf, path2: &PathBuf, output_path: Option<&PathBuf>, cfg: &Config) {
+    WalkDir::new(path1)
         .into_iter()
         .filter_entry(|e| !is_hidden(e))
         .zip(
-            WalkDir::new(&path2)
+            WalkDir::new(path2)
                 .into_iter()
                 .filter_entry(|e| !is_hidden(e)),
         )
@@ -86,15 +80,12 @@ fn explore(
                 && path1_file.extension().unwrap() == "json"
                 && path2_file.extension().unwrap() == "json"
             {
-                act_on_file(&path1_file, &path2_file, &output_path, &cfg).unwrap();
+                act_on_file(&path1_file, &path2_file, output_path, cfg).unwrap();
             }
         });
-
-    Ok(())
 }
 
-#[inline(always)]
-fn exist_or_exit(path: &PathBuf, which_path: &str) {
+fn exist_or_exit(path: &Path, which_path: &str) {
     if !(path.exists()) {
         eprintln!(
             "The {} path `{}` is not correct",
@@ -178,11 +169,11 @@ fn main() {
     };
 
     if path1.is_dir() && path2.is_dir() {
-        explore(&path1, &path2, &output_path, &cfg).unwrap();
+        explore(&path1, &path2, output_path.as_ref(), &cfg);
     } else if (path1.is_dir() && !path2.is_dir()) || (!path1.is_dir() && path2.is_dir()) {
         eprintln!("Both paths should be a directory or a file",);
         process::exit(1);
     } else {
-        act_on_file(&path1, &path2, &output_path, &cfg).unwrap();
+        act_on_file(&path1, &path2, output_path.as_ref(), &cfg).unwrap();
     }
 }
