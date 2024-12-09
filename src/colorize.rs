@@ -78,10 +78,7 @@ where
                         if op == " " && subvalue.is_none() {
                             output(" ", &format!("{subindent}..."));
                         } else {
-                            assert!(
-                                ([" ", "-", "+", "~"].contains(&op)),
-                                "Unexpected op '{op}'"
-                            );
+                            assert!(([" ", "-", "+", "~"].contains(&op)), "Unexpected op '{op}'");
                             let subvalue = subvalue.unwrap();
                             let color = if op == "~" { " " } else { op };
                             subcolorize(None, subvalue, output, color, subindent);
