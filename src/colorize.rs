@@ -80,8 +80,7 @@ where
                         } else {
                             assert!(
                                 ([" ", "-", "+", "~"].contains(&op)),
-                                "Unexpected op '{}'",
-                                op
+                                "Unexpected op '{op}'"
                             );
                             let subvalue = subvalue.unwrap();
                             let color = if op == "~" { " " } else { op };

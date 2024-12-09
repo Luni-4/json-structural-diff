@@ -230,8 +230,7 @@ impl JsonDiff {
                     for key in seq1.iter().take(opcode.first_end).skip(opcode.first_start) {
                         let is_scalarized1 = Self::is_scalarized(key, &originals1);
                         assert!(!is_scalarized1 || (Self::is_scalarized(key, &originals2)),
-                            "Internal bug: the items associated to the key {} are different in the two dictionaries",
-                            key
+                            "Internal bug: the items associated to the key {key} are different in the two dictionaries"
                         );
                         if is_scalarized1 {
                             let item1 = Self::descalarize(key, &scalar_values1, &originals1);
