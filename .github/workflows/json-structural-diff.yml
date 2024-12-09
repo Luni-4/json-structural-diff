@@ -8,67 +8,66 @@ on:
     branches:
       - master
 
+env:
+  GRCOV_VERSION: "0.8.20"
+
 jobs:
   clippy-rustfmt:
 
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Install stable
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        profile: minimal
-        toolchain: stable
-        override: true
-        components: clippy, rustfmt
+        components: rustfmt, clippy
 
     - name: Run rustfmt
-      uses: actions-rs/cargo@v1
-      with:
-        command: fmt
-        args: -- --check --verbose
+      run:
+        cargo fmt --all -- --check --verbose
 
     - name: Run cargo clippy
-      uses: actions-rs/clippy-check@v1
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        args: --all-features -- -D warnings
+      run: cargo clippy --tests -- -Dclippy::all -Dclippy::pedantic
 
   code-coverage:
 
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
+    - uses: actions/checkout@v4
 
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-features --no-fail-fast
-        env:
-          CARGO_INCREMENTAL: '0'
-          RUSTFLAGS: >
-            -Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code
-            -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests
-          RUSTDOCFLAGS: >
-            -Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code
-            -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: llvm-tools-preview
 
-      - id: coverage
-        uses: actions-rs/grcov@v0.1
+    - name: Install grcov
+      env:
+        GRCOV_LINK: https://github.com/mozilla/grcov/releases/download
+      run: |
+        curl -L "$GRCOV_LINK/v$GRCOV_VERSION/grcov-x86_64-unknown-linux-musl.tar.bz2" |
+        tar xj -C $HOME/.cargo/bin
 
-      - name: Coveralls upload
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: ${{ steps.coverage.outputs.report }}
+    - name: Run tests
+      env:
+        RUSTFLAGS: "-Cinstrument-coverage"
+        LLVM_PROFILE_FILE: "json-structural-diff-%p-%m.profraw"
+      run: |
+        cargo test --verbose
+
+    - name: Get coverage data for codecov
+      run: |
+        grcov . --binary-path ./target/debug/ -s . -t lcov --branch \
+              --ignore-not-existing --ignore "/*" --ignore "../*" -o lcov.info
+
+    - name: Codecov upload
+      uses: codecov/codecov-action@v4
+      with:
+        files: lcov.info
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   tests:
 
@@ -79,14 +78,10 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Install stable
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
+      uses: dtolnay/rust-toolchain@stable
 
     - name: Build
       run: |
